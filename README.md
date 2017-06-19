@@ -8,3 +8,5 @@ Simply run:
 make
 node script.js
 ```
+
+A CSV file is written inside the out/ directory with the results for every test.
