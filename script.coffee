@@ -10,7 +10,8 @@ cmm2 = require './cmm2'
 memory = new cmm2.Memory
 
 OUTPUT_DIR = './out'
-NS_PER_SEC = 1e9
+MS_PER_SEC = 1e3
+NANOSECONDS_PER_MS = 1e6
 REPETITIONS = 3
 
 fs.mkdirSync(OUTPUT_DIR) unless fs.existsSync(OUTPUT_DIR)
@@ -24,13 +25,11 @@ TESTS =
     matrixmul: range(50, 350, 50)
 
 useTimer = (file, value) ->
-    command = "timer"
-
-    { stderr: output } = spawnSync command, ['-ni', file, value], encoding: 'utf-8'
+    { stderr: output } = spawnSync "timer", ['-ni', file, value], encoding: 'utf-8'
 
     { elapsed } = JSON.parse output
 
-    elapsed/1000
+    elapsed/1000 # Elapsed is in microseconds, result in milliseconds
 
 cmmMeasure = (file, value, compileFn, compileTransform, runFn) ->
     compilation = compileTransform compileFn(fs.readFileSync(file, 'utf-8'))
@@ -39,19 +38,23 @@ cmmMeasure = (file, value, compileFn, compileTransform, runFn) ->
     runFn(compilation, value.toString())
     diff = process.hrtime(start)
 
-    (diff[0]*NS_PER_SEC + diff[1])/1000000
+    [ seconds, nanoseconds ] = diff
 
-runcmm1 = (ast, input) ->
+    seconds*MS_PER_SEC + nanoseconds/NANOSECONDS_PER_MS
+
+###
+runcmm11 = (ast, input) ->
     iterator = cmm11.execute(ast, input)
     done = false
     until done
         { done } = iterator.next()
+###
 
 measureTime =
     cmm2: (file, value) -> cmmMeasure(file, value, cmm2.compile, ((x)-> x.program.attachMemory(memory); x.program), cmm2.runSync)
     cmm1: (file, value) -> cmmMeasure(file, value, cmm1.compile, ((x)->x), cmm1.execute)
-    #cmm11: (file, value) -> cmmMeasure(file, value, cmm11.compile, ((x)->x), runcmm1)
-    cc: (file, value) -> useTimer file[...-3], value
+    #cmm11: (file, value) -> cmmMeasure(file, value, cmm11.compile, ((x)->x), runcmm11)
+    cc: (file, value) -> useTimer file[...-3], value # Remove .cc extension(executable has no extension)
     js: useTimer
     py: useTimer
 
