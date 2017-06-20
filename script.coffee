@@ -18,9 +18,10 @@ fs.mkdirSync(OUTPUT_DIR) unless fs.existsSync(OUTPUT_DIR)
 range = (b, e, i) -> (x for x in [b..e] by i)
 
 TESTS =
-    is_prime: range(1, 10, 1)
+    primality: range(1, 10, 1)
     fibonacci: range(25, 50, 5)
     collatz: range(10000, 50000, 5000)
+    matrixmul: range(50, 350, 50)
 
 useTimer = (file, value) ->
     command = "timer"
@@ -49,7 +50,7 @@ runcmm1 = (ast, input) ->
 measureTime =
     cmm2: (file, value) -> cmmMeasure(file, value, cmm2.compile, ((x)-> x.program.attachMemory(memory); x.program), cmm2.runSync)
     cmm1: (file, value) -> cmmMeasure(file, value, cmm1.compile, ((x)->x), cmm1.execute)
-#    cmm11: (file, value) -> cmmMeasure(file, value, cmm11.compile, ((x)->x), runcmm1)
+    #cmm11: (file, value) -> cmmMeasure(file, value, cmm11.compile, ((x)->x), runcmm1)
     cc: (file, value) -> useTimer file[...-3], value
     js: useTimer
     py: useTimer
@@ -57,6 +58,17 @@ measureTime =
 extNames = Object.keys(measureTime)
 
 results = {}
+
+shouldPerformTest = (language, test, value) ->
+    if test is 'fibonacci'
+        if ((language.indexOf('cmm') >= 0 and value > 35) or (language is 'py' and value > 40))
+            return no
+
+    if test is 'matrixmul'
+        if language in ['cmm1', 'cmm11']
+            return no
+
+    return yes
 
 for test, values of TESTS
     languages = {}
@@ -73,9 +85,7 @@ for test, values of TESTS
         file = languages[language]
         results[test][language] = []
         for value in values
-            if test is 'fibonacci' and ((language.indexOf('cmm') >= 0 and value > 35) or (language is 'py' and value > 40))
-                continue
-            else
+            if shouldPerformTest(language, test, value)
                 timeAvg = 0
                 for times in [0...REPETITIONS]
                     time = measureTime[language](file, value)
